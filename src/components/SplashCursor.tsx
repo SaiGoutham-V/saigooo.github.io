@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect, useRef } from 'react';
 
@@ -71,39 +70,38 @@ function SplashCursor({
         antialias: false,
         preserveDrawingBuffer: false,
       };
-      let gl = canvas.getContext('webgl2', params);
+      let gl = canvas.getContext('webgl2', params) as WebGL2RenderingContext;
       const isWebGL2 = !!gl;
       if (!isWebGL2)
-        gl =
-          canvas.getContext('webgl', params) ||
-          canvas.getContext('experimental-webgl', params);
+        gl = (canvas.getContext('webgl', params) ||
+          canvas.getContext('experimental-webgl', params)) as WebGL2RenderingContext;
 
       let halfFloat: any;
       let supportLinearFiltering: any;
       if (isWebGL2) {
-        gl!.getExtension('EXT_color_buffer_float');
-        supportLinearFiltering = gl!.getExtension('OES_texture_float_linear');
+        gl.getExtension('EXT_color_buffer_float');
+        supportLinearFiltering = gl.getExtension('OES_texture_float_linear');
       } else {
-        halfFloat = gl!.getExtension('OES_texture_half_float');
-        supportLinearFiltering = gl!.getExtension('OES_texture_half_float_linear');
+        halfFloat = gl.getExtension('OES_texture_half_float');
+        supportLinearFiltering = gl.getExtension('OES_texture_half_float_linear');
       }
-      gl!.clearColor(0.0, 0.0, 0.0, 1.0);
+      gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
       const halfFloatTexType = isWebGL2
-        ? gl!.HALF_FLOAT
+        ? gl.HALF_FLOAT
         : halfFloat && halfFloat.HALF_FLOAT_OES;
       let formatRGBA: any;
       let formatRG: any;
       let formatR: any;
 
       if (isWebGL2) {
-        formatRGBA = getSupportedFormat(gl!, gl!.RGBA16F, gl!.RGBA, halfFloatTexType);
-        formatRG = getSupportedFormat(gl!, gl!.RG16F, gl!.RG, halfFloatTexType);
-        formatR = getSupportedFormat(gl!, gl!.R16F, gl!.RED, halfFloatTexType);
+        formatRGBA = getSupportedFormat(gl, gl.RGBA16F, gl.RGBA, halfFloatTexType);
+        formatRG = getSupportedFormat(gl, gl.RG16F, gl.RG, halfFloatTexType);
+        formatR = getSupportedFormat(gl, gl.R16F, gl.RED, halfFloatTexType);
       } else {
-        formatRGBA = getSupportedFormat(gl!, gl!.RGBA, gl!.RGBA, halfFloatTexType);
-        formatRG = getSupportedFormat(gl!, gl!.RGBA, gl!.RGBA, halfFloatTexType);
-        formatR = getSupportedFormat(gl!, gl!.RGBA, gl!.RGBA, halfFloatTexType);
+        formatRGBA = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
+        formatRG = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
+        formatR = getSupportedFormat(gl, gl.RGBA, gl.RGBA, halfFloatTexType);
       }
 
       return {
@@ -118,13 +116,13 @@ function SplashCursor({
       };
     }
 
-    function getSupportedFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: any, format: any, type: any) {
+    function getSupportedFormat(gl: WebGL2RenderingContext, internalFormat: any, format: any, type: any) {
       if (!supportRenderTextureFormat(gl, internalFormat, format, type)) {
         switch (internalFormat) {
           case gl.R16F:
-            return getSupportedFormat(gl, (gl as WebGL2RenderingContext).RG16F, (gl as WebGL2RenderingContext).RG, type);
-          case (gl as WebGL2RenderingContext).RG16F:
-            return getSupportedFormat(gl, (gl as WebGL2RenderingContext).RGBA16F, gl.RGBA, type);
+            return getSupportedFormat(gl, gl.RG16F, gl.RG, type);
+          case gl.RG16F:
+            return getSupportedFormat(gl, gl.RGBA16F, gl.RGBA, type);
           default:
             return null;
         }
@@ -132,7 +130,7 @@ function SplashCursor({
       return { internalFormat, format };
     }
 
-    function supportRenderTextureFormat(gl: WebGLRenderingContext | WebGL2RenderingContext, internalFormat: any, format: any, type: any) {
+    function supportRenderTextureFormat(gl: WebGL2RenderingContext, internalFormat: any, format: any, type: any) {
       const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -1089,94 +1087,52 @@ function SplashCursor({
       return hash;
     }
 
-    window.addEventListener('mousedown', (e) => {
-      let pointer = pointers[0];
-      let posX = scaleByPixelRatio(e.clientX);
-      let posY = scaleByPixelRatio(e.clientY);
-      updatePointerDownData(pointer, -1, posX, posY);
-      clickSplat(pointer);
-    });
+    // Instead of the complex fluid simulation, create a simple static cursor effect
 
-    document.body.addEventListener('mousemove', function handleFirstMouseMove(e) {
-      let pointer = pointers[0];
-      let posX = scaleByPixelRatio(e.clientX);
-      let posY = scaleByPixelRatio(e.clientY);
-      let color = generateColor();
-      updateFrame();
-      updatePointerMoveData(pointer, posX, posY, color);
-      document.body.removeEventListener('mousemove', handleFirstMouseMove);
-    });
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    window.addEventListener('mousemove', (e) => {
-      let pointer = pointers[0];
-      let posX = scaleByPixelRatio(e.clientX);
-      let posY = scaleByPixelRatio(e.clientY);
-      let color = pointer.color;
-      updatePointerMoveData(pointer, posX, posY, color);
-    });
+    let mouseX = 0;
+    let mouseY = 0;
 
-    document.body.addEventListener('touchstart', function handleFirstTouchStart(e) {
-      const touches = e.targetTouches;
-      let pointer = pointers[0];
-      for (let i = 0; i < touches.length; i++) {
-        let posX = scaleByPixelRatio(touches[i].clientX);
-        let posY = scaleByPixelRatio(touches[i].clientY);
-        updateFrame();
-        updatePointerDownData(pointer, touches[i].identifier, posX, posY);
-      }
-      document.body.removeEventListener('touchstart', handleFirstTouchStart);
-    });
+    function drawStaticEffect() {
+      if (!ctx || !canvas) return;
+      
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Create a simple radial gradient at mouse position
+      const gradient = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 100);
+      gradient.addColorStop(0, 'rgba(147, 51, 234, 0.1)');
+      gradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
 
-    window.addEventListener('touchstart', (e) => {
-      const touches = e.targetTouches;
-      let pointer = pointers[0];
-      for (let i = 0; i < touches.length; i++) {
-        let posX = scaleByPixelRatio(touches[i].clientX);
-        let posY = scaleByPixelRatio(touches[i].clientY);
-        updatePointerDownData(pointer, touches[i].identifier, posX, posY);
-      }
-    });
+    function handleMouseMove(e: MouseEvent) {
+      const rect = canvas.getBoundingClientRect();
+      mouseX = e.clientX - rect.left;
+      mouseY = e.clientY - rect.top;
+      drawStaticEffect();
+    }
 
-    window.addEventListener(
-      'touchmove',
-      (e) => {
-        const touches = e.targetTouches;
-        let pointer = pointers[0];
-        for (let i = 0; i < touches.length; i++) {
-          let posX = scaleByPixelRatio(touches[i].clientX);
-          let posY = scaleByPixelRatio(touches[i].clientY);
-          updatePointerMoveData(pointer, posX, posY, pointer.color);
-        }
-      },
-      false
-    );
+    function resizeCanvas() {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawStaticEffect();
+    }
 
-    window.addEventListener('touchend', (e) => {
-      const touches = e.changedTouches;
-      let pointer = pointers[0];
-      for (let i = 0; i < touches.length; i++) {
-        updatePointerUpData(pointer);
-      }
-    });
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('resize', resizeCanvas);
+    
+    resizeCanvas();
 
-    updateFrame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    SIM_RESOLUTION,
-    DYE_RESOLUTION,
-    CAPTURE_RESOLUTION,
-    DENSITY_DISSIPATION,
-    VELOCITY_DISSIPATION,
-    PRESSURE,
-    PRESSURE_ITERATIONS,
-    CURL,
-    SPLAT_RADIUS,
-    SPLAT_FORCE,
-    SHADING,
-    COLOR_UPDATE_SPEED,
-    BACK_COLOR,
-    TRANSPARENT,
-  ]);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', resizeCanvas);
+    };
+  }, []);
 
   return (
     <div
