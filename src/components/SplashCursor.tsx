@@ -2,70 +2,133 @@
 'use client';
 import { useEffect, useRef } from 'react';
 
-function SplashCursor({
-  SIM_RESOLUTION = 128,
-  DYE_RESOLUTION = 1440,
-  CAPTURE_RESOLUTION = 512,
-  DENSITY_DISSIPATION = 3.5,
-  VELOCITY_DISSIPATION = 2,
-  PRESSURE = 0.1,
-  PRESSURE_ITERATIONS = 20,
-  CURL = 3,
-  SPLAT_RADIUS = 0.2,
-  SPLAT_FORCE = 6000,
-  SHADING = true,
-  COLOR_UPDATE_SPEED = 10,
-  BACK_COLOR = { r: 0.5, g: 0, b: 0 },
-  TRANSPARENT = true
-}) {
+function SplashCursor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Instead of the complex fluid simulation, create a simple static cursor effect
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let mouseX = 0;
     let mouseY = 0;
+    let particles: Array<{
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      life: number;
+      maxLife: number;
+      size: number;
+      color: string;
+    }> = [];
 
-    function drawStaticEffect() {
-      if (!ctx || !canvas) return;
+    const colors = [
+      'rgba(147, 51, 234, 0.6)', // purple
+      'rgba(59, 130, 246, 0.6)', // blue
+      'rgba(16, 185, 129, 0.6)', // emerald
+      'rgba(236, 72, 153, 0.6)', // pink
+    ];
+
+    function createParticle(x: number, y: number) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 3 + 1;
+      const life = Math.random() * 60 + 30;
       
+      return {
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life,
+        maxLife: life,
+        size: Math.random() * 4 + 2,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      };
+    }
+
+    function updateParticles() {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const particle = particles[i];
+        
+        particle.x += particle.vx;
+        particle.y += particle.vy;
+        particle.vx *= 0.98; // friction
+        particle.vy *= 0.98;
+        particle.life--;
+        
+        if (particle.life <= 0) {
+          particles.splice(i, 1);
+        }
+      }
+    }
+
+    function drawParticles() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // Create a simple radial gradient at mouse position
-      const gradient = ctx.createRadialGradient(mouseX, mouseY, 0, mouseX, mouseY, 100);
-      gradient.addColorStop(0, 'rgba(147, 51, 234, 0.1)');
-      gradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
-      
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(particle => {
+        const alpha = particle.life / particle.maxLife;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+
+    function animate() {
+      updateParticles();
+      drawParticles();
+      requestAnimationFrame(animate);
     }
 
     function handleMouseMove(e: MouseEvent) {
       const rect = canvas.getBoundingClientRect();
-      mouseX = e.clientX - rect.left;
-      mouseY = e.clientY - rect.top;
-      drawStaticEffect();
+      const newMouseX = e.clientX - rect.left;
+      const newMouseY = e.clientY - rect.top;
+      
+      // Create particles when mouse moves
+      if (Math.abs(newMouseX - mouseX) > 2 || Math.abs(newMouseY - mouseY) > 2) {
+        for (let i = 0; i < 3; i++) {
+          particles.push(createParticle(newMouseX, newMouseY));
+        }
+      }
+      
+      mouseX = newMouseX;
+      mouseY = newMouseY;
+    }
+
+    function handleClick(e: MouseEvent) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      // Create splash effect on click
+      for (let i = 0; i < 15; i++) {
+        particles.push(createParticle(x, y));
+      }
     }
 
     function resizeCanvas() {
       if (!canvas) return;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      drawStaticEffect();
     }
 
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('click', handleClick);
     window.addEventListener('resize', resizeCanvas);
     
     resizeCanvas();
+    animate();
 
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('click', handleClick);
       window.removeEventListener('resize', resizeCanvas);
     };
   }, []);
@@ -84,7 +147,6 @@ function SplashCursor({
     >
       <canvas
         ref={canvasRef}
-        id="fluid"
         style={{
           width: '100vw',
           height: '100vh',
